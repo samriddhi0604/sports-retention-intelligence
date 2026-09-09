@@ -4,3 +4,4 @@ __pycache__/
 *.joblib
 .env
 data/raw/
+data/processed/

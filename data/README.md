@@ -1,7 +1,16 @@
 # Data sources
 
-`data/raw/` is gitignored (raw downloads, ~750MB total). Run `python data/ingest.py`
-from the project root (with the `.venv` active) to re-download everything below.
+`data/raw/` and `data/processed/` are both gitignored -- everything in them is
+regenerated deterministically from the pipeline scripts, so nothing there needs
+to be committed. From the project root, with `.venv` active:
+
+```
+python data/ingest.py    # -> data/raw/        (~750MB, re-downloaded fresh)
+python data/clean.py     # -> data/processed/clean_*.csv
+python data/features.py  # -> (feature engineering, Step 1d)
+python data/validate.py  # -> data/processed/  (final feature table, Step 1e)
+```
+
 Each source is fetched fresh from its origin -- no API key required for any of them.
 
 ## 1. Cricsheet -- IPL 2024 match calendar
