@@ -104,7 +104,9 @@ def clean_imdb_catalog() -> pd.DataFrame:
     )
     assert catalog["tconst"].is_unique, "tconst must be unique in the final catalog"
 
-    catalog["genres"] = catalog["genres"].str.split(",")
+    # genres is kept as a raw comma-separated string here (not split into a
+    # Python list) so it round-trips through CSV cleanly -- split downstream
+    # wherever it's actually consumed.
 
     out = PROCESSED_DIR / "clean_imdb_catalog.csv"
     PROCESSED_DIR.mkdir(parents=True, exist_ok=True)
