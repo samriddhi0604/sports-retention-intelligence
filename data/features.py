@@ -41,6 +41,15 @@ Two-phase simulation avoids circularity between "features" and "churn":
      features computed from it, which is what downstream steps actually
      use) is truncated to before that day -- exactly like a real churn
      dataset, where you only ever see behavior up to the point someone left.
+
+The full per-session log (not just the aggregated per-user table) is also
+persisted, since Step 5's recommender needs per-user session ordering over
+time (gateway analysis) and the full user-item interaction matrix
+(collaborative filtering). Match windows are day-granularity, not the
+original +/-2-hour spec, because Cricsheet records match dates but not
+kickoff times (documented in data/README.md) -- this applies to the session
+log's `session_type` tagging the same way it already applies to
+sports_spike_engagement.
 """
 
 from __future__ import annotations
@@ -288,6 +297,26 @@ def build_user_feature_table() -> pd.DataFrame:
     observed_sessions = sessions_with_churn[observed_mask]
     n_truncated = len(sessions_with_churn) - len(observed_sessions)
     print(f"[features] truncated {n_truncated} post-churn sessions from observed history")
+
+    # Persist the raw per-session log itself (not just the aggregated table)
+    # -- required by Step 5 (gateway analysis needs per-user session
+    # ordering over time; collaborative filtering needs the full user-item
+    # interaction matrix). This is the exact same OBSERVED session set the
+    # aggregate features above are computed from (not the full-window
+    # hypothetical history used only internally for churn sampling) --
+    # keeping one consistent "what actually happened" dataset rather than
+    # exposing two different session logs downstream. tconst is used as the
+    # canonical item id (not the title string) so joins stay unambiguous.
+    sessions_log = observed_sessions[["user_id", "tconst", "date"]].rename(
+        columns={"tconst": "title_id", "date": "timestamp"}
+    )
+    sessions_log["session_type"] = np.where(
+        sessions_log["timestamp"].dt.normalize().isin(match_day_set), "sports_window", "movie"
+    )
+    sessions_log = sessions_log.sort_values(["user_id", "timestamp"]).reset_index(drop=True)
+    sessions_out = PROCESSED_DIR / "sessions_raw.csv"
+    sessions_log.to_csv(sessions_out, index=False)
+    print(f"[features] wrote {sessions_out} ({len(sessions_log)} rows)")
 
     observed_features = (
         observed_sessions.groupby("user_id").apply(summarize, include_groups=False).reset_index()
