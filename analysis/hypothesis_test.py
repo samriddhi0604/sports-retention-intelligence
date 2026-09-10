@@ -27,12 +27,10 @@ RESULTS_PATH = PROCESSED_DIR / "hypothesis_test_results.json"
 ALPHA = 0.05
 
 
-def run_hypothesis_test() -> dict:
-    df = pd.read_csv(PROCESSED_DIR / "user_features.csv")
-
-    retained = df.loc[df["churned"] == 0, "sports_spike_engagement"]
-    churned = df.loc[df["churned"] == 1, "sports_spike_engagement"]
-
+def compare_groups(retained: pd.Series, churned: pd.Series) -> dict:
+    """Pure comparison function, independent of where the two groups came
+    from -- lets tests feed in a small hand-constructed / synthetic case
+    directly rather than only exercising this via the full CSV pipeline."""
     # Shapiro-Wilk on each group (subsampled if large -- the test is only
     # reliable up to a few thousand points, and we just need a normality
     # read, not an exact p-value on the full set).
@@ -77,6 +75,15 @@ def run_hypothesis_test() -> dict:
         "std_sports_spike_engagement_retained": float(retained.std()),
         "std_sports_spike_engagement_churned": float(churned.std()),
     }
+    return output
+
+
+def run_hypothesis_test() -> dict:
+    df = pd.read_csv(PROCESSED_DIR / "user_features.csv")
+    retained = df.loc[df["churned"] == 0, "sports_spike_engagement"]
+    churned = df.loc[df["churned"] == 1, "sports_spike_engagement"]
+
+    output = compare_groups(retained, churned)
 
     print("=== Hypothesis test: sports_spike_engagement, retained vs. churned ===")
     for key, value in output.items():
