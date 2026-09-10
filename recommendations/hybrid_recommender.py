@@ -73,19 +73,32 @@ def hybrid_recommend(
     catalog: pd.DataFrame,
     genre_idx: dict,
     top_n: int = 10,
+    force_content_only: bool = False,
 ) -> pd.DataFrame:
     """Candidates are drawn from `item_ids` (the CF-eligible, >=2-session
     universe -- rare items aren't good recommendation candidates anyway).
     But the user's PROFILE is built from all of their distinct watched
     items, including ones too rare to have a CF embedding -- a singleton
     watched title still has real genre/rating metadata and should still
-    inform the content-based half of the score, not be silently dropped."""
+    inform the content-based half of the score, not be silently dropped.
+
+    force_content_only bypasses the weight_cf formula entirely (used as an
+    explicit baseline for evaluate_recommender.py's offline check) --
+    passing zeroed-out embeddings instead would NOT work: weight_cf would
+    still come out >0 from the formula, and with zero embeddings that just
+    makes every score 0 (an arbitrary tie-order), not a genuine
+    content-based ranking."""
     item_idx = {t: i for i, t in enumerate(item_ids)}
     watched_item_ids = list(dict.fromkeys(watched_item_ids))  # distinct, order-preserving
     interaction_count = len(watched_item_ids)
-    weight_cf, weight_content = compute_weights(interaction_count)
+    weight_cf, weight_content = (0.0, 1.0) if force_content_only else compute_weights(interaction_count)
 
-    cf_watched_idx = [item_idx[t] for t in watched_item_ids if t in item_idx]
+    # items to exclude from candidates (already watched, if they're even in
+    # the candidate universe) -- independent of force_content_only, which
+    # only affects whether their embeddings feed the CF profile
+    watched_in_candidates_idx = [item_idx[t] for t in watched_item_ids if t in item_idx]
+
+    cf_watched_idx = [] if force_content_only else watched_in_candidates_idx
     if cf_watched_idx:
         cf_profile = item_embeddings[cf_watched_idx].mean(axis=0, keepdims=True)
         cf_sims = cosine_similarity(cf_profile, item_embeddings)[0]
@@ -109,7 +122,7 @@ def hybrid_recommend(
         content_sims = np.zeros(len(item_ids))
 
     hybrid_scores = weight_cf * cf_sims + weight_content * content_sims
-    for idx in cf_watched_idx:
+    for idx in watched_in_candidates_idx:
         hybrid_scores[idx] = -np.inf
 
     top_idx = np.argsort(-hybrid_scores)[:top_n]
