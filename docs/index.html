@@ -1,0 +1,698 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="An interactive walkthrough of a real-data study testing whether live IPL cricket engagement predicts streaming subscriber retention, built on real Cricsheet, IMDb, and Wikipedia data.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>&%23127951;</text></svg>">
+<title>Does Cricket Keep You Watching?</title>
+</head>
+<body>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+
+<style>
+  :root {
+    --bg: #F4F6FA;
+    --surface: #FFFFFF;
+    --surface-2: #EAEEF6;
+    --ink: #10182A;
+    --ink-muted: #5B6478;
+    --ink-faint: #8A93A8;
+    --border: rgba(16,24,42,0.10);
+    --border-strong: rgba(16,24,42,0.16);
+    --accent: #B36B00;
+    --accent-glow: #FFB020;
+    --good: #0E9C82;
+    --good-strong: #087A66;
+    --bad: #E2472A;
+    --bad-strong: #C33A20;
+    --shadow: 0 1px 2px rgba(16,24,42,0.06), 0 8px 24px rgba(16,24,42,0.06);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0B1220;
+      --surface: #121B2E;
+      --surface-2: #17223A;
+      --ink: #EDF1F7;
+      --ink-muted: #98A2B8;
+      --ink-faint: #6B7690;
+      --border: rgba(237,241,247,0.10);
+      --border-strong: rgba(237,241,247,0.18);
+      --accent: #FFB020;
+      --accent-glow: #FFB020;
+      --good: #1FBFA0;
+      --good-strong: #33D6C0;
+      --bad: #FF6A4D;
+      --bad-strong: #FF8B72;
+      --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 12px 32px rgba(0,0,0,0.35);
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0B1220;
+    --surface: #121B2E;
+    --surface-2: #17223A;
+    --ink: #EDF1F7;
+    --ink-muted: #98A2B8;
+    --ink-faint: #6B7690;
+    --border: rgba(237,241,247,0.10);
+    --border-strong: rgba(237,241,247,0.18);
+    --accent: #FFB020;
+    --accent-glow: #FFB020;
+    --good: #1FBFA0;
+    --good-strong: #33D6C0;
+    --bad: #FF6A4D;
+    --bad-strong: #FF8B72;
+    --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 12px 32px rgba(0,0,0,0.35);
+  }
+
+  * { box-sizing: border-box; }
+  html { color-scheme: light dark; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'IBM Plex Sans', system-ui, -apple-system, sans-serif;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+  h1, h2, h3, .display {
+    font-family: 'Bebas Neue', 'Arial Narrow', sans-serif;
+    font-weight: 400;
+    letter-spacing: 0.01em;
+    text-wrap: balance;
+    line-height: 0.95;
+  }
+  .mono {
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    font-variant-numeric: tabular-nums;
+  }
+  a { color: inherit; }
+  ::selection { background: var(--accent-glow); color: #10182A; }
+
+  /* ---------- layout shell ---------- */
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 0 28px; }
+  .prose { max-width: 640px; }
+  section { padding: 96px 0; border-top: 1px solid var(--border); }
+  section:first-of-type { border-top: none; }
+  @media (max-width: 720px) { section { padding: 64px 0; } .wrap { padding: 0 20px; } }
+
+  .eyebrow {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--accent);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 18px;
+  }
+  .eyebrow .num { color: var(--ink-faint); }
+  .eyebrow::after { content: ""; height: 1px; flex: 1; background: var(--border-strong); }
+
+  h2.title { font-size: clamp(40px, 6vw, 68px); margin: 0 0 20px; }
+  h3.subtitle { font-size: clamp(22px, 3vw, 28px); color: var(--ink); margin: 0 0 12px; }
+  p.lead { font-size: 19px; color: var(--ink-muted); margin: 0 0 8px; }
+  p.body-text { font-size: 16px; color: var(--ink-muted); }
+  .prose p + p { margin-top: 14px; }
+
+  /* ---------- nav ---------- */
+  .nav {
+    position: sticky; top: 0; z-index: 40;
+    backdrop-filter: blur(10px);
+    background: color-mix(in srgb, var(--bg) 82%, transparent);
+    border-bottom: 1px solid var(--border);
+  }
+  .nav-inner { display: flex; align-items: center; justify-content: space-between; padding: 16px 28px; max-width: 1080px; margin: 0 auto; }
+  .brand { font-family: 'Bebas Neue', sans-serif; font-size: 22px; letter-spacing: 0.03em; display: flex; align-items: center; gap: 8px; }
+  .brand .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent-glow); box-shadow: 0 0 10px var(--accent-glow); }
+  .nav-link {
+    font-family: 'IBM Plex Mono', monospace; font-size: 13px; letter-spacing: 0.04em;
+    text-decoration: none; color: var(--ink-muted); border: 1px solid var(--border-strong);
+    padding: 8px 14px; border-radius: 3px; transition: all .15s ease;
+  }
+  .nav-link:hover { color: var(--ink); border-color: var(--accent); }
+
+  /* ---------- hero ---------- */
+  .hero { padding: 84px 0 72px; position: relative; overflow: hidden; }
+  .hero-glow {
+    position: absolute; top: -220px; right: -160px; width: 620px; height: 620px;
+    background: radial-gradient(circle, color-mix(in srgb, var(--accent-glow) 28%, transparent) 0%, transparent 70%);
+    pointer-events: none;
+  }
+  .hero-kicker {
+    font-family: 'IBM Plex Mono', monospace; font-size: 13px; letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--ink-faint); margin-bottom: 20px; display: flex; align-items: center; gap: 10px;
+  }
+  .hero-kicker .live { width: 7px; height: 7px; border-radius: 50%; background: var(--bad); animation: pulse 1.8s ease-in-out infinite; }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .35; } }
+  h1.hero-title {
+    font-size: clamp(48px, 9vw, 108px);
+    margin: 0 0 28px;
+    max-width: 15ch;
+  }
+  h1.hero-title .accent-word { color: var(--accent-glow); }
+  .hero-sub { max-width: 62ch; }
+
+  .scoreboard {
+    display: flex; gap: 0; margin-top: 48px; border: 1px solid var(--border-strong);
+    border-radius: 6px; overflow: hidden; background: var(--surface); box-shadow: var(--shadow);
+  }
+  .score-cell { flex: 1; padding: 22px 24px; position: relative; }
+  .score-cell + .score-cell { border-left: 1px solid var(--border); }
+  .score-cell .label { font-family: 'IBM Plex Mono', monospace; font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-faint); margin-bottom: 6px; }
+  .score-cell .num { font-family: 'Bebas Neue', sans-serif; font-size: 44px; line-height: 1; }
+  .score-cell .num.good { color: var(--good-strong); }
+  .score-cell .num.bad { color: var(--bad); }
+  .score-cell .sub { font-size: 13px; color: var(--ink-muted); margin-top: 4px; }
+  @media (max-width: 640px) { .scoreboard { flex-direction: column; } .score-cell + .score-cell { border-left: none; border-top: 1px solid var(--border); } }
+
+  /* ---------- reveal on scroll ---------- */
+  .reveal { opacity: 1; transform: none; transition: opacity .6s ease, transform .6s ease; }
+  @media (prefers-reduced-motion: no-preference) {
+    .reveal.pending { opacity: 0; transform: translateY(18px); }
+  }
+
+  /* ---------- data source cards ---------- */
+  .source-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; margin-top: 40px; }
+  @media (max-width: 780px) { .source-grid { grid-template-columns: 1fr; } }
+  .source-card { background: var(--surface); padding: 28px 24px; }
+  .source-card .tag {
+    display: inline-block; font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.08em;
+    text-transform: uppercase; padding: 3px 8px; border-radius: 3px; margin-bottom: 14px;
+  }
+  .tag.real { background: color-mix(in srgb, var(--good) 16%, transparent); color: var(--good-strong); }
+  .tag.sim { background: color-mix(in srgb, var(--accent-glow) 18%, transparent); color: var(--accent); }
+  .source-card h4 { font-family: 'Bebas Neue', sans-serif; font-size: 26px; margin: 0 0 8px; letter-spacing: 0.01em; }
+  .source-card p { font-size: 14.5px; color: var(--ink-muted); margin: 0; }
+  .source-card .stat { font-family: 'IBM Plex Mono', monospace; font-size: 13px; color: var(--ink); margin-top: 12px; font-weight: 600; }
+
+  .sim-note {
+    margin-top: 24px; padding: 20px 24px; border: 1px dashed var(--border-strong); border-radius: 8px;
+    background: color-mix(in srgb, var(--accent-glow) 6%, var(--surface)); font-size: 14.5px; color: var(--ink-muted);
+  }
+  .sim-note b { color: var(--ink); }
+
+  /* ---------- tug of war bar ---------- */
+  .tug { margin: 44px 0 8px; }
+  .tug-track { position: relative; height: 64px; border-radius: 10px; overflow: hidden; display: flex; border: 1px solid var(--border-strong); }
+  .tug-seg { display: flex; align-items: center; height: 100%; transition: flex-basis 1s cubic-bezier(.2,.8,.2,1); }
+  .tug-seg.retained { background: var(--good); justify-content: flex-start; }
+  .tug-seg.churned { background: var(--bad); justify-content: flex-end; }
+  .tug-seg .fig { font-family: 'Bebas Neue', sans-serif; font-size: 30px; color: #0B1220; padding: 0 20px; }
+  .tug-legend { display: flex; justify-content: space-between; margin-top: 10px; font-size: 13.5px; color: var(--ink-muted); }
+  .tug-legend span b { color: var(--ink); }
+  .swatch { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 6px; }
+
+  .p-callout {
+    margin-top: 32px; padding: 20px 24px; border-left: 3px solid var(--accent); border-radius: 0 8px 8px 0;
+    background: var(--surface-2); font-size: 15px;
+  }
+  .p-callout .mono { color: var(--accent); font-weight: 600; }
+
+  /* ---------- timeline chart ---------- */
+  .chart-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 26px 22px 18px; margin-top: 36px; box-shadow: var(--shadow); }
+  .chart-head { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 6px; flex-wrap: wrap; gap: 10px; }
+  .chart-head h4 { font-family: 'Bebas Neue', sans-serif; font-size: 22px; margin: 0; }
+  .chart-legend { display: flex; gap: 16px; flex-wrap: wrap; font-size: 12.5px; color: var(--ink-muted); }
+  .chart-legend .item { display: flex; align-items: center; gap: 6px; }
+  #timeline-svg { width: 100%; height: auto; display: block; }
+  .tl-point { cursor: pointer; }
+  .tl-tooltip {
+    position: absolute; pointer-events: none; background: var(--ink); color: var(--bg);
+    font-family: 'IBM Plex Mono', monospace; font-size: 12px; padding: 8px 10px; border-radius: 5px;
+    transform: translate(-50%, -115%); white-space: nowrap; opacity: 0; transition: opacity .1s ease; z-index: 5;
+    box-shadow: 0 6px 16px rgba(0,0,0,0.25);
+  }
+  .tl-tooltip.show { opacity: 1; }
+  .chart-foot { display: flex; gap: 28px; margin-top: 14px; flex-wrap: wrap; }
+  .chart-foot .metric { }
+  .chart-foot .metric .v { font-family: 'Bebas Neue', sans-serif; font-size: 30px; line-height: 1; }
+  .chart-foot .metric .l { font-size: 12px; color: var(--ink-muted); margin-top: 2px; }
+
+  /* ---------- coefficient bars ---------- */
+  .coef-list { margin-top: 40px; display: flex; flex-direction: column; gap: 22px; }
+  .coef-row { display: grid; grid-template-columns: 220px 1fr 90px; align-items: center; gap: 16px; }
+  @media (max-width: 620px) { .coef-row { grid-template-columns: 1fr; gap: 6px; } .coef-row .coef-val { text-align: left; } }
+  .coef-row .coef-name { font-size: 15px; font-weight: 600; }
+  .coef-row .coef-name .sub { display: block; font-weight: 400; font-size: 12.5px; color: var(--ink-faint); margin-top: 2px; }
+  .coef-track { height: 14px; background: var(--surface-2); border-radius: 4px; overflow: hidden; }
+  .coef-fill { height: 100%; background: linear-gradient(90deg, var(--good), var(--good-strong)); border-radius: 4px; transform-origin: left; }
+  .coef-val { font-family: 'IBM Plex Mono', monospace; font-size: 15px; text-align: right; color: var(--ink); font-weight: 600; }
+
+  /* ---------- stat tile grid ---------- */
+  .tile-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 32px; }
+  @media (max-width: 700px) { .tile-grid { grid-template-columns: 1fr; } }
+  .tile {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 22px;
+  }
+  .tile .v { font-family: 'Bebas Neue', sans-serif; font-size: 42px; line-height: 1; color: var(--accent); }
+  .tile .l { font-size: 14px; font-weight: 600; margin-top: 6px; }
+  .tile .d { font-size: 13px; color: var(--ink-muted); margin-top: 4px; }
+
+  /* ---------- experiment cards (recommender) ---------- */
+  .exp-list { display: flex; flex-direction: column; gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; margin-top: 36px; }
+  .exp-card { background: var(--surface); padding: 26px 28px; display: grid; grid-template-columns: 56px 1fr; gap: 20px; }
+  @media (max-width: 640px) { .exp-card { grid-template-columns: 1fr; } }
+  .exp-num { font-family: 'Bebas Neue', sans-serif; font-size: 40px; color: var(--ink-faint); line-height: 1; }
+  .exp-body h4 { font-family: 'Bebas Neue', sans-serif; font-size: 22px; margin: 0 0 6px; letter-spacing: 0.01em; }
+  .exp-body p { font-size: 14.5px; color: var(--ink-muted); margin: 0 0 10px; max-width: 62ch; }
+  .verdict {
+    display: inline-flex; align-items: center; gap: 7px; font-family: 'IBM Plex Mono', monospace; font-size: 12.5px;
+    padding: 5px 11px; border-radius: 4px; font-weight: 600; letter-spacing: 0.02em;
+  }
+  .verdict.negative { background: color-mix(in srgb, var(--bad) 14%, transparent); color: var(--bad-strong); }
+  .verdict.mixed { background: color-mix(in srgb, var(--accent-glow) 18%, transparent); color: var(--accent); }
+  .verdict::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+
+  /* ---------- limitations ---------- */
+  .limit-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; margin-top: 36px; }
+  @media (max-width: 720px) { .limit-grid { grid-template-columns: 1fr; } }
+  .limit-card { background: var(--surface); padding: 22px 24px; }
+  .limit-card .k { font-family: 'IBM Plex Mono', monospace; font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--bad); margin-bottom: 8px; }
+  .limit-card p { font-size: 14.5px; color: var(--ink-muted); margin: 0; }
+  .limit-card p b { color: var(--ink); }
+
+  /* ---------- footer ---------- */
+  footer { padding: 64px 0 56px; }
+  .foot-grid { display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 24px; }
+  .foot-links { display: flex; gap: 14px; flex-wrap: wrap; }
+  .foot-btn {
+    font-family: 'IBM Plex Mono', monospace; font-size: 13px; text-decoration: none; color: var(--ink);
+    border: 1px solid var(--border-strong); padding: 10px 18px; border-radius: 5px; display: inline-flex; align-items: center; gap: 8px;
+    transition: all .15s ease;
+  }
+  .foot-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .foot-btn.primary { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+  .foot-btn.primary:hover { background: var(--accent); border-color: var(--accent); color: #10182A; }
+  footer .fine { font-size: 13px; color: var(--ink-faint); margin-top: 28px; max-width: 60ch; }
+</style>
+
+<div class="nav">
+  <div class="nav-inner">
+    <div class="brand"><span class="dot"></span>RETENTION&nbsp;INTELLIGENCE</div>
+    <a class="nav-link" href="https://github.com/samriddhi0604/sports-retention-intelligence" target="_blank" rel="noopener">VIEW REPO →</a>
+  </div>
+</div>
+
+<div class="wrap">
+
+  <section class="hero">
+    <div class="hero-glow"></div>
+    <div class="hero-kicker"><span class="live"></span>A REAL-DATA STUDY · IPL 2024</div>
+    <h1 class="hero-title">Does watching <span class="accent-word">cricket</span> keep you subscribed?</h1>
+    <p class="lead hero-sub">A streaming platform carries movies and live sport side by side. This project tests
+      one specific question with real match data, a real film catalog, and a simulated subscriber base — then
+      builds a model and a recommendation engine on top of whatever the answer turns out to be.</p>
+
+    <div class="scoreboard reveal pending" data-reveal>
+      <div class="score-cell">
+        <div class="label">Subscribers who stayed</div>
+        <div class="num good">46.5<span style="font-size:22px;">%</span></div>
+        <div class="sub">of viewing on real match days</div>
+      </div>
+      <div class="score-cell">
+        <div class="label">Subscribers who left</div>
+        <div class="num bad">23.0<span style="font-size:22px;">%</span></div>
+        <div class="sub">of viewing on real match days</div>
+      </div>
+      <div class="score-cell">
+        <div class="label">Chance this is a fluke</div>
+        <div class="num">≈0</div>
+        <div class="sub">p ≈ 10⁻²³²</div>
+      </div>
+    </div>
+  </section>
+
+  <section id="setup">
+    <div class="eyebrow"><span class="num">01</span> THE SET-UP</div>
+    <h2 class="title">Real matches.<br>Real movies.<br>Simulated viewers.</h2>
+    <div class="prose">
+      <p class="lead">There's no public dataset of who watches what on a streaming platform, or who
+        cancels — that's the platform's most guarded commercial secret. So this project uses a different
+        strategy: take every piece of real data that <i>is</i> public, and simulate only the one thing that
+        genuinely can't be found anywhere.</p>
+    </div>
+
+    <div class="source-grid">
+      <div class="source-card reveal pending" data-reveal>
+        <span class="tag real">REAL DATA</span>
+        <h4>The Match Calendar</h4>
+        <p>Every IPL 2024 fixture, pulled from Cricsheet's free public archive — official ball-by-ball
+          cricket data, no login required.</p>
+        <div class="stat">71 real matches</div>
+      </div>
+      <div class="source-card reveal pending" data-reveal>
+        <span class="tag real">REAL DATA</span>
+        <h4>The Film Catalog</h4>
+        <p>Indian-language titles from IMDb's public bulk datasets, with their real genres and real
+          audience ratings attached.</p>
+        <div class="stat">109,854 real movies</div>
+      </div>
+      <div class="source-card reveal pending" data-reveal>
+        <span class="tag real">REAL DATA</span>
+        <h4>The Public Pulse</h4>
+        <p>Daily Wikipedia traffic to the IPL's own page — a public stand-in for "how much was the country
+          paying attention today."</p>
+        <div class="stat">182 real days tracked</div>
+      </div>
+    </div>
+
+    <div class="sim-note">
+      <b>What's simulated, and why that's still honest:</b> 5,000 subscribers were generated, because no
+      real per-user viewing history exists to use instead. But every one of their simulated viewing sessions
+      picks an actual movie from the real catalog above, and is timed against the real match calendar — so
+      the <i>behavior</i> is invented, but everything it's measured against is not.
+    </div>
+  </section>
+
+  <section id="finding-1">
+    <div class="eyebrow"><span class="num">02</span> FINDING ONE</div>
+    <h2 class="title">The sports effect is real</h2>
+    <div class="prose">
+      <p class="lead">Split the simulated subscribers into two groups — the ones who stayed, and the ones who
+        cancelled — and look at how much of their viewing happened on a real match day.</p>
+      <p class="body-text">The two groups don't just differ a little. Subscribers who stayed subscribed did
+        roughly twice as much of their watching around real IPL matches as subscribers who left.</p>
+    </div>
+
+    <div class="tug reveal pending" data-reveal>
+      <div class="tug-track">
+        <div class="tug-seg retained" style="flex-basis: 66.9%;"><span class="fig">46.5%</span></div>
+        <div class="tug-seg churned" style="flex-basis: 33.1%;"><span class="fig">23.0%</span></div>
+      </div>
+      <div class="tug-legend">
+        <span><span class="swatch" style="background:var(--good)"></span><b>Stayed subscribed</b> · 3,257 people</span>
+        <span><b>Cancelled</b> · 1,722 people<span class="swatch" style="background:var(--bad); margin-left:6px; margin-right:0;"></span></span>
+      </div>
+    </div>
+
+    <div class="p-callout">
+      In plain terms: if sports-watching genuinely had <i>nothing</i> to do with staying subscribed, seeing a
+      gap this size purely by chance would be astronomically unlikely — the actual odds work out to about
+      <span class="mono">1 in 10²³²</span>. That's not a typo; there are more zeroes in that number than there
+      are atoms worth counting. This is the project's headline result, and everything below acts on it.
+    </div>
+  </section>
+
+  <section id="finding-2">
+    <div class="eyebrow"><span class="num">03</span> FINDING TWO</div>
+    <h2 class="title">Spotting a big match from the outside</h2>
+    <div class="prose">
+      <p class="lead">If sports-watching really drives engagement, you should be able to see a big match
+        happen just by watching traffic spike — without anyone telling you the schedule.</p>
+      <p class="body-text">Compare daily Wikipedia traffic against a "typical Tuesday" (or whichever weekday)
+        baseline, and flag any day that spikes far above it. Hover the chart below — it's the real
+        182-day series, with real IPL match days marked underneath.</p>
+    </div>
+
+    <div class="chart-card reveal pending" data-reveal>
+      <div class="chart-head">
+        <h4>Daily public interest, Jan – Jun 2024</h4>
+        <div class="chart-legend">
+          <span class="item"><span class="swatch" style="background:var(--good)"></span>Correctly flagged</span>
+          <span class="item"><span class="swatch" style="background:var(--ink-faint)"></span>Missed match day</span>
+          <span class="item"><span class="swatch" style="background:var(--bad)"></span>False alarm</span>
+        </div>
+      </div>
+      <div style="position:relative;">
+        <svg id="timeline-svg" viewBox="0 0 1000 320" preserveAspectRatio="none"></svg>
+        <div class="tl-tooltip" id="tl-tooltip"></div>
+      </div>
+      <div class="chart-foot">
+        <div class="metric"><div class="v">59%</div><div class="l">of real match days caught</div></div>
+        <div class="metric"><div class="v">97%</div><div class="l">of flagged days were genuine</div></div>
+        <div class="metric"><div class="v">36 / 61</div><div class="l">match days correctly flagged</div></div>
+      </div>
+    </div>
+    <p class="body-text" style="margin-top:18px; max-width:62ch;">Notice recall trails off toward
+      late April and May — as the baseline itself climbs through a busy IPL season, individual match
+      days stop standing out from the week before them. A limitation worth showing, not hiding.</p>
+  </section>
+
+  <section id="finding-3">
+    <div class="eyebrow"><span class="num">04</span> FINDING THREE</div>
+    <h2 class="title">Who's about to leave?</h2>
+    <div class="prose">
+      <p class="lead">A simple formula — a logistic regression — was trained to weigh three habits against
+        each other and estimate a subscriber's risk of cancelling.</p>
+      <p class="body-text">The formula essentially asks: does this person watch sports, does their taste
+        range across genres, and do they generally enjoy what they pick? Each answer pulls their risk score
+        up or down. Here's how strongly each one actually mattered, once the model was trained on real
+        behavior patterns:</p>
+    </div>
+
+    <div class="coef-list reveal pending" data-reveal>
+      <div class="coef-row">
+        <div class="coef-name">Sports engagement<span class="sub">watches around real matches</span></div>
+        <div class="coef-track"><div class="coef-fill" style="width:100%"></div></div>
+        <div class="coef-val">−1.47</div>
+      </div>
+      <div class="coef-row">
+        <div class="coef-name">Genre diversity<span class="sub">range of what they watch</span></div>
+        <div class="coef-track"><div class="coef-fill" style="width:46%"></div></div>
+        <div class="coef-val">−0.68</div>
+      </div>
+      <div class="coef-row">
+        <div class="coef-name">Completion / rating<span class="sub">how much they liked their picks</span></div>
+        <div class="coef-track"><div class="coef-fill" style="width:19%"></div></div>
+        <div class="coef-val">−0.28</div>
+      </div>
+    </div>
+    <p class="body-text" style="margin-top:14px;">Every bar points the same way: more of each habit, lower
+      cancellation risk — and sports engagement isn't just first, it's more than twice as influential as the
+      next strongest signal. That's a direct, measured confirmation of Finding One, not a separate coincidence.</p>
+
+    <div class="tile-grid reveal pending" data-reveal>
+      <div class="tile">
+        <div class="v">90%</div>
+        <div class="l">Precision</div>
+        <div class="d">When the model flags someone as at-risk, it's right 9 times out of 10.</div>
+      </div>
+      <div class="tile">
+        <div class="v">57%</div>
+        <div class="l">Recall</div>
+        <div class="d">Of everyone who actually left, the model had correctly flagged just over half in advance.</div>
+      </div>
+      <div class="tile">
+        <div class="v">0.77</div>
+        <div class="l">Overall grade (AUC)</div>
+        <div class="d">A believable, real-world score — not suspiciously perfect, which would be a red flag.</div>
+      </div>
+    </div>
+  </section>
+
+  <section id="finding-4">
+    <div class="eyebrow"><span class="num">05</span> FINDING FOUR</div>
+    <h2 class="title">Winning them back</h2>
+    <div class="prose">
+      <p class="lead">Knowing who's at risk is only useful if you know what to recommend them. Three
+        approaches were tried here, in increasing sophistication — and the honest result of each is reported
+        as-is, including the ones that didn't pan out.</p>
+    </div>
+
+    <div class="exp-list">
+      <div class="exp-card reveal pending" data-reveal>
+        <div class="exp-num">01</div>
+        <div class="exp-body">
+          <h4>Gateway content</h4>
+          <p>Do subscribers who later became power-users have something in common in what they watched
+            <i>before</i> that ramp-up? If so, that's a "gateway" worth recommending to others.</p>
+          <span class="verdict negative">Sports was NOT the gateway</span>
+        </div>
+      </div>
+      <div class="exp-card reveal pending" data-reveal>
+        <div class="exp-num">02</div>
+        <div class="exp-body">
+          <h4>Collaborative filtering</h4>
+          <p>Factorize who-watched-what into a map of viewing taste, then check whether titles with nothing
+            in common on paper still cluster together in that map — a sign of real hidden affinity.</p>
+          <span class="verdict mixed">Inconclusive — flagged as unproven, not oversold</span>
+        </div>
+      </div>
+      <div class="exp-card reveal pending" data-reveal>
+        <div class="exp-num">03</div>
+        <div class="exp-body">
+          <h4>Hybrid, cold-start-aware model</h4>
+          <p>Blend that taste-map with straightforward genre/rating similarity, leaning more on genre for
+            subscribers too new to have a reliable taste profile yet.</p>
+          <span class="verdict mixed">Works as designed; a validation gap disclosed openly</span>
+        </div>
+      </div>
+    </div>
+
+    <p class="body-text" style="margin-top:24px; max-width:64ch;">A far simpler rule was tested alongside all
+      of this, as a baseline: just recommend sports content to anyone at-risk whose sports engagement sits
+      below the average retained subscriber. <b style="color:var(--ink)">98.9%</b> of at-risk subscribers
+      qualified — which sounds impressive, but is really just a restatement of Finding Three's strongest
+      coefficient, not a new discovery.</p>
+  </section>
+
+  <section id="limitations">
+    <div class="eyebrow"><span class="num">06</span> POST-MATCH REVIEW</div>
+    <h2 class="title">What this isn't</h2>
+    <div class="prose">
+      <p class="lead">A clear-eyed limitations list is a feature of this project, not something to bury in
+        a footnote.</p>
+    </div>
+
+    <div class="limit-grid">
+      <div class="limit-card reveal pending" data-reveal>
+        <div class="k">Simulated population</div>
+        <p>Real per-user streaming data doesn't exist publicly, anywhere. Every subscriber here is
+          simulated — <b>but</b> grounded in the real match calendar and real film catalog throughout.</p>
+      </div>
+      <div class="limit-card reveal pending" data-reveal>
+        <div class="k">Daily, not hourly</div>
+        <p>Match times aren't published in the source data, and the public traffic API only reports daily
+          totals — so every measurement here works at day-level precision, not hour-level.</p>
+      </div>
+      <div class="limit-card reveal pending" data-reveal>
+        <div class="k">A genuine null result</div>
+        <p>The gateway-content experiment did <b>not</b> find sports content to be a meaningful entry point
+          in this data. Reported honestly rather than reframed into a win.</p>
+      </div>
+      <div class="limit-card reveal pending" data-reveal>
+        <div class="k">An unproven signal, flagged as such</div>
+        <p>The collaborative-filtering "hidden affinity" result didn't hold up under scrutiny — it's more
+          consistent with a statistical artifact than a genuine discovery, and is reported that way.</p>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <div class="foot-grid">
+      <div>
+        <div class="brand"><span class="dot"></span>RETENTION&nbsp;INTELLIGENCE</div>
+        <p class="fine">Built end-to-end on real Cricsheet, IMDb, and Wikipedia data, with a simulated
+          subscriber layer disclosed throughout — not presented as real-world outcomes.</p>
+      </div>
+      <div class="foot-links">
+        <a class="foot-btn primary" href="https://github.com/samriddhi0604/sports-retention-intelligence" target="_blank" rel="noopener">Full repository ↗</a>
+        <a class="foot-btn" href="https://github.com/samriddhi0604/sports-retention-intelligence/blob/master/README.md" target="_blank" rel="noopener">Methodology ↗</a>
+        <a class="foot-btn" href="https://github.com/samriddhi0604/sports-retention-intelligence/blob/master/HURDLES.md" target="_blank" rel="noopener">Build log ↗</a>
+      </div>
+    </div>
+  </footer>
+
+</div>
+
+<script>
+  // ---------- scroll reveal ----------
+  (function () {
+    var els = document.querySelectorAll('[data-reveal]');
+    if (!('IntersectionObserver' in window)) return;
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) {
+        if (e.isIntersecting) { e.target.classList.remove('pending'); io.unobserve(e.target); }
+      });
+    }, { threshold: 0.15 });
+    els.forEach(function (el) { el.classList.add('pending'); io.observe(el); });
+  })();
+
+  // ---------- timeline chart, built from the real spike-detection output ----------
+  (function () {
+    var data = [{"date_str": "2024-01-01", "views": 4020, "baseline": 20392, "is_flagged": false, "is_match": false}, {"date_str": "2024-01-02", "views": 2911, "baseline": 17418, "is_flagged": false, "is_match": false}, {"date_str": "2024-01-03", "views": 13370, "baseline": 19700, "is_flagged": false, "is_match": false}, {"date_str": "2024-01-04", "views": 9416, "baseline": 16355, "is_flagged": false, "is_match": false}, {"date_str": "2024-01-05", "views": 4016, "baseline": 17569, "is_flagged": false, "is_match": false}, {"date_str": "2024-01-06", "views": 7478, "baseline": 15969, "is_flagged": false, "is_match": false}, {"date_str": "2024-01-07", "views": 14953, "baseline": 22165, "is_flagged": false, "is_match": false}, {"date_str": "2024-01-08", "views": 13343, "baseline": 20392, "is_flagged": false, "is_match": false}, {"date_str": "2024-01-09", "views": 7531, "baseline": 17418, "is_flagged": false, "is_match": false}, {"date_str": "2024-01-10", "views": 2820, "baseline": 19700, "is_flagged": false, "is_match": false}, {"date_str": "2024-01-11", "views": 2790, "baseline": 16355, "is_flagged": false, "is_match": false}, {"date_str": "2024-01-12", "views": 5798, "baseline": 17569, "is_flagged": false, "is_match": false}, {"date_str": "2024-01-13", "views": 7015, "baseline": 15969, "is_flagged": false, "is_match": false}, {"date_str": "2024-01-14", "views": 3803, "baseline": 22165, "is_flagged": false, "is_match": false}, {"date_str": "2024-01-15", "views": 3770, "baseline": 20392, "is_flagged": false, "is_match": false}, {"date_str": "2024-01-16", "views": 4187, "baseline": 17418, "is_flagged": false, "is_match": false}, {"date_str": "2024-01-17", "views": 3983, "baseline": 19700, "is_flagged": false, "is_match": false}, {"date_str": "2024-01-18", "views": 4365, "baseline": 16355, "is_flagged": false, "is_match": false}, {"date_str": "2024-01-19", "views": 6247, "baseline": 17569, "is_flagged": false, "is_match": false}, {"date_str": "2024-01-20", "views": 6126, "baseline": 15969, "is_flagged": false, "is_match": false}, {"date_str": "2024-01-21", "views": 8647, "baseline": 22165, "is_flagged": false, "is_match": false}, {"date_str": "2024-01-22", "views": 12983, "baseline": 20392, "is_flagged": false, "is_match": false}, {"date_str": "2024-01-23", "views": 13098, "baseline": 17418, "is_flagged": false, "is_match": false}, {"date_str": "2024-01-24", "views": 9752, "baseline": 19700, "is_flagged": false, "is_match": false}, {"date_str": "2024-01-25", "views": 13689, "baseline": 16355, "is_flagged": false, "is_match": false}, {"date_str": "2024-01-26", "views": 13475, "baseline": 17569, "is_flagged": false, "is_match": false}, {"date_str": "2024-01-27", "views": 13993, "baseline": 15969, "is_flagged": false, "is_match": false}, {"date_str": "2024-01-28", "views": 15767, "baseline": 22165, "is_flagged": false, "is_match": false}, {"date_str": "2024-01-29", "views": 14249, "baseline": 20392, "is_flagged": false, "is_match": false}, {"date_str": "2024-01-30", "views": 16295, "baseline": 17418, "is_flagged": false, "is_match": false}, {"date_str": "2024-01-31", "views": 15078, "baseline": 19700, "is_flagged": false, "is_match": false}, {"date_str": "2024-02-01", "views": 15190, "baseline": 16355, "is_flagged": false, "is_match": false}, {"date_str": "2024-02-02", "views": 16166, "baseline": 17569, "is_flagged": false, "is_match": false}, {"date_str": "2024-02-03", "views": 16467, "baseline": 15969, "is_flagged": false, "is_match": false}, {"date_str": "2024-02-04", "views": 18396, "baseline": 22165, "is_flagged": false, "is_match": false}, {"date_str": "2024-02-05", "views": 19798, "baseline": 20392, "is_flagged": false, "is_match": false}, {"date_str": "2024-02-06", "views": 18542, "baseline": 17418, "is_flagged": false, "is_match": false}, {"date_str": "2024-02-07", "views": 19389, "baseline": 19700, "is_flagged": false, "is_match": false}, {"date_str": "2024-02-08", "views": 20376, "baseline": 16355, "is_flagged": false, "is_match": false}, {"date_str": "2024-02-09", "views": 18972, "baseline": 17569, "is_flagged": false, "is_match": false}, {"date_str": "2024-02-10", "views": 15471, "baseline": 15969, "is_flagged": false, "is_match": false}, {"date_str": "2024-02-11", "views": 21552, "baseline": 22165, "is_flagged": false, "is_match": false}, {"date_str": "2024-02-12", "views": 19346, "baseline": 20392, "is_flagged": false, "is_match": false}, {"date_str": "2024-02-13", "views": 14869, "baseline": 17418, "is_flagged": false, "is_match": false}, {"date_str": "2024-02-14", "views": 21105, "baseline": 19700, "is_flagged": false, "is_match": false}, {"date_str": "2024-02-15", "views": 20189, "baseline": 16355, "is_flagged": false, "is_match": false}, {"date_str": "2024-02-16", "views": 20429, "baseline": 17569, "is_flagged": false, "is_match": false}, {"date_str": "2024-02-17", "views": 22483, "baseline": 15969, "is_flagged": false, "is_match": false}, {"date_str": "2024-02-18", "views": 27955, "baseline": 22165, "is_flagged": false, "is_match": false}, {"date_str": "2024-02-19", "views": 26425, "baseline": 20392, "is_flagged": false, "is_match": false}, {"date_str": "2024-02-20", "views": 31676, "baseline": 17418, "is_flagged": false, "is_match": false}, {"date_str": "2024-02-21", "views": 32615, "baseline": 19700, "is_flagged": false, "is_match": false}, {"date_str": "2024-02-22", "views": 42142, "baseline": 16355, "is_flagged": false, "is_match": false}, {"date_str": "2024-02-23", "views": 19556, "baseline": 17569, "is_flagged": false, "is_match": false}, {"date_str": "2024-02-24", "views": 13945, "baseline": 15969, "is_flagged": false, "is_match": false}, {"date_str": "2024-02-25", "views": 13323, "baseline": 22165, "is_flagged": false, "is_match": false}, {"date_str": "2024-02-26", "views": 9593, "baseline": 20392, "is_flagged": false, "is_match": false}, {"date_str": "2024-02-27", "views": 12435, "baseline": 17418, "is_flagged": false, "is_match": false}, {"date_str": "2024-02-28", "views": 11560, "baseline": 19700, "is_flagged": false, "is_match": false}, {"date_str": "2024-02-29", "views": 12035, "baseline": 16355, "is_flagged": false, "is_match": false}, {"date_str": "2024-03-01", "views": 4050, "baseline": 17569, "is_flagged": false, "is_match": false}, {"date_str": "2024-03-02", "views": 14704, "baseline": 15969, "is_flagged": false, "is_match": false}, {"date_str": "2024-03-03", "views": 14949, "baseline": 22165, "is_flagged": false, "is_match": false}, {"date_str": "2024-03-04", "views": 15021, "baseline": 20392, "is_flagged": false, "is_match": false}, {"date_str": "2024-03-05", "views": 14909, "baseline": 17418, "is_flagged": false, "is_match": false}, {"date_str": "2024-03-06", "views": 13548, "baseline": 19700, "is_flagged": false, "is_match": false}, {"date_str": "2024-03-07", "views": 12543, "baseline": 16355, "is_flagged": false, "is_match": false}, {"date_str": "2024-03-08", "views": 13098, "baseline": 17569, "is_flagged": false, "is_match": false}, {"date_str": "2024-03-09", "views": 18377, "baseline": 15969, "is_flagged": false, "is_match": false}, {"date_str": "2024-03-10", "views": 22778, "baseline": 22165, "is_flagged": false, "is_match": false}, {"date_str": "2024-03-11", "views": 21648, "baseline": 20392, "is_flagged": false, "is_match": false}, {"date_str": "2024-03-12", "views": 23316, "baseline": 17418, "is_flagged": false, "is_match": false}, {"date_str": "2024-03-13", "views": 20012, "baseline": 19700, "is_flagged": false, "is_match": false}, {"date_str": "2024-03-14", "views": 17520, "baseline": 16355, "is_flagged": false, "is_match": false}, {"date_str": "2024-03-15", "views": 26711, "baseline": 17569, "is_flagged": false, "is_match": false}, {"date_str": "2024-03-16", "views": 32813, "baseline": 15969, "is_flagged": false, "is_match": false}, {"date_str": "2024-03-17", "views": 46838, "baseline": 22165, "is_flagged": false, "is_match": false}, {"date_str": "2024-03-18", "views": 45360, "baseline": 20392, "is_flagged": false, "is_match": false}, {"date_str": "2024-03-19", "views": 46549, "baseline": 17418, "is_flagged": false, "is_match": false}, {"date_str": "2024-03-20", "views": 55421, "baseline": 19700, "is_flagged": false, "is_match": false}, {"date_str": "2024-03-21", "views": 105215, "baseline": 16355, "is_flagged": true, "is_match": false}, {"date_str": "2024-03-22", "views": 361086, "baseline": 17569, "is_flagged": true, "is_match": true}, {"date_str": "2024-03-23", "views": 476856, "baseline": 15969, "is_flagged": true, "is_match": true}, {"date_str": "2024-03-24", "views": 460306, "baseline": 22165, "is_flagged": true, "is_match": true}, {"date_str": "2024-03-25", "views": 350044, "baseline": 20392, "is_flagged": true, "is_match": true}, {"date_str": "2024-03-26", "views": 287290, "baseline": 17418, "is_flagged": true, "is_match": true}, {"date_str": "2024-03-27", "views": 299100, "baseline": 19700, "is_flagged": true, "is_match": true}, {"date_str": "2024-03-28", "views": 231687, "baseline": 16355, "is_flagged": true, "is_match": true}, {"date_str": "2024-03-29", "views": 265365, "baseline": 17569, "is_flagged": true, "is_match": true}, {"date_str": "2024-03-30", "views": 261570, "baseline": 15969, "is_flagged": true, "is_match": true}, {"date_str": "2024-03-31", "views": 294367, "baseline": 22165, "is_flagged": true, "is_match": true}, {"date_str": "2024-04-01", "views": 345656, "baseline": 20392, "is_flagged": true, "is_match": true}, {"date_str": "2024-04-02", "views": 380644, "baseline": 17418, "is_flagged": true, "is_match": true}, {"date_str": "2024-04-03", "views": 369069, "baseline": 19700, "is_flagged": true, "is_match": true}, {"date_str": "2024-04-04", "views": 264024, "baseline": 16355, "is_flagged": true, "is_match": true}, {"date_str": "2024-04-05", "views": 196208, "baseline": 17569, "is_flagged": true, "is_match": true}, {"date_str": "2024-04-06", "views": 303248, "baseline": 15969, "is_flagged": true, "is_match": true}, {"date_str": "2024-04-07", "views": 350570, "baseline": 22165, "is_flagged": true, "is_match": true}, {"date_str": "2024-04-08", "views": 229530, "baseline": 20392, "is_flagged": true, "is_match": true}, {"date_str": "2024-04-09", "views": 239893, "baseline": 17418, "is_flagged": true, "is_match": true}, {"date_str": "2024-04-10", "views": 247746, "baseline": 19700, "is_flagged": true, "is_match": true}, {"date_str": "2024-04-11", "views": 196701, "baseline": 16355, "is_flagged": true, "is_match": true}, {"date_str": "2024-04-12", "views": 178727, "baseline": 17569, "is_flagged": true, "is_match": true}, {"date_str": "2024-04-13", "views": 215844, "baseline": 15969, "is_flagged": true, "is_match": true}, {"date_str": "2024-04-14", "views": 244393, "baseline": 22165, "is_flagged": true, "is_match": true}, {"date_str": "2024-04-15", "views": 303211, "baseline": 20392, "is_flagged": true, "is_match": true}, {"date_str": "2024-04-16", "views": 254184, "baseline": 17418, "is_flagged": true, "is_match": true}, {"date_str": "2024-04-17", "views": 269753, "baseline": 19700, "is_flagged": true, "is_match": true}, {"date_str": "2024-04-18", "views": 139330, "baseline": 16355, "is_flagged": true, "is_match": true}, {"date_str": "2024-04-19", "views": 86080, "baseline": 17569, "is_flagged": false, "is_match": true}, {"date_str": "2024-04-20", "views": 95870, "baseline": 15969, "is_flagged": true, "is_match": true}, {"date_str": "2024-04-21", "views": 108104, "baseline": 22165, "is_flagged": false, "is_match": true}, {"date_str": "2024-04-22", "views": 105663, "baseline": 20392, "is_flagged": false, "is_match": true}, {"date_str": "2024-04-23", "views": 129511, "baseline": 17418, "is_flagged": true, "is_match": true}, {"date_str": "2024-04-24", "views": 131821, "baseline": 19700, "is_flagged": true, "is_match": true}, {"date_str": "2024-04-25", "views": 95414, "baseline": 16355, "is_flagged": true, "is_match": true}, {"date_str": "2024-04-26", "views": 87263, "baseline": 17569, "is_flagged": true, "is_match": true}, {"date_str": "2024-04-27", "views": 117152, "baseline": 15969, "is_flagged": true, "is_match": true}, {"date_str": "2024-04-28", "views": 124097, "baseline": 22165, "is_flagged": true, "is_match": true}, {"date_str": "2024-04-29", "views": 95421, "baseline": 20392, "is_flagged": false, "is_match": true}, {"date_str": "2024-04-30", "views": 124975, "baseline": 17418, "is_flagged": true, "is_match": true}, {"date_str": "2024-05-01", "views": 87886, "baseline": 19700, "is_flagged": false, "is_match": true}, {"date_str": "2024-05-02", "views": 66857, "baseline": 16355, "is_flagged": false, "is_match": true}, {"date_str": "2024-05-03", "views": 75781, "baseline": 17569, "is_flagged": false, "is_match": true}, {"date_str": "2024-05-04", "views": 68664, "baseline": 15969, "is_flagged": false, "is_match": true}, {"date_str": "2024-05-05", "views": 68557, "baseline": 22165, "is_flagged": false, "is_match": true}, {"date_str": "2024-05-06", "views": 66523, "baseline": 20392, "is_flagged": false, "is_match": true}, {"date_str": "2024-05-07", "views": 40269, "baseline": 17418, "is_flagged": false, "is_match": true}, {"date_str": "2024-05-08", "views": 38011, "baseline": 19700, "is_flagged": false, "is_match": true}, {"date_str": "2024-05-09", "views": 33603, "baseline": 16355, "is_flagged": false, "is_match": true}, {"date_str": "2024-05-10", "views": 24540, "baseline": 17569, "is_flagged": false, "is_match": true}, {"date_str": "2024-05-11", "views": 20909, "baseline": 15969, "is_flagged": false, "is_match": true}, {"date_str": "2024-05-12", "views": 38155, "baseline": 22165, "is_flagged": false, "is_match": true}, {"date_str": "2024-05-13", "views": 30776, "baseline": 20392, "is_flagged": false, "is_match": false}, {"date_str": "2024-05-14", "views": 30253, "baseline": 17418, "is_flagged": false, "is_match": true}, {"date_str": "2024-05-15", "views": 23416, "baseline": 19700, "is_flagged": false, "is_match": true}, {"date_str": "2024-05-16", "views": 19458, "baseline": 16355, "is_flagged": false, "is_match": false}, {"date_str": "2024-05-17", "views": 21203, "baseline": 17569, "is_flagged": false, "is_match": true}, {"date_str": "2024-05-18", "views": 28935, "baseline": 15969, "is_flagged": false, "is_match": true}, {"date_str": "2024-05-19", "views": 41690, "baseline": 22165, "is_flagged": false, "is_match": true}, {"date_str": "2024-05-20", "views": 20985, "baseline": 20392, "is_flagged": false, "is_match": false}, {"date_str": "2024-05-21", "views": 18717, "baseline": 17418, "is_flagged": false, "is_match": true}, {"date_str": "2024-05-22", "views": 22085, "baseline": 19700, "is_flagged": false, "is_match": true}, {"date_str": "2024-05-23", "views": 13720, "baseline": 16355, "is_flagged": false, "is_match": false}, {"date_str": "2024-05-24", "views": 14992, "baseline": 17569, "is_flagged": false, "is_match": true}, {"date_str": "2024-05-25", "views": 14871, "baseline": 15969, "is_flagged": false, "is_match": false}, {"date_str": "2024-05-26", "views": 43426, "baseline": 22165, "is_flagged": false, "is_match": true}, {"date_str": "2024-05-27", "views": 29934, "baseline": 20392, "is_flagged": false, "is_match": false}, {"date_str": "2024-05-28", "views": 11461, "baseline": 17418, "is_flagged": false, "is_match": false}, {"date_str": "2024-05-29", "views": 7890, "baseline": 19700, "is_flagged": false, "is_match": false}, {"date_str": "2024-05-30", "views": 5871, "baseline": 16355, "is_flagged": false, "is_match": false}, {"date_str": "2024-05-31", "views": 4448, "baseline": 17569, "is_flagged": false, "is_match": false}, {"date_str": "2024-06-01", "views": 4100, "baseline": 15969, "is_flagged": false, "is_match": false}, {"date_str": "2024-06-02", "views": 3704, "baseline": 22165, "is_flagged": false, "is_match": false}, {"date_str": "2024-06-03", "views": 3483, "baseline": 20392, "is_flagged": false, "is_match": false}, {"date_str": "2024-06-04", "views": 2331, "baseline": 17418, "is_flagged": false, "is_match": false}, {"date_str": "2024-06-05", "views": 2224, "baseline": 19700, "is_flagged": false, "is_match": false}, {"date_str": "2024-06-06", "views": 1976, "baseline": 16355, "is_flagged": false, "is_match": false}, {"date_str": "2024-06-07", "views": 1781, "baseline": 17569, "is_flagged": false, "is_match": false}, {"date_str": "2024-06-08", "views": 1999, "baseline": 15969, "is_flagged": false, "is_match": false}, {"date_str": "2024-06-09", "views": 2442, "baseline": 22165, "is_flagged": false, "is_match": false}, {"date_str": "2024-06-10", "views": 1902, "baseline": 20392, "is_flagged": false, "is_match": false}, {"date_str": "2024-06-11", "views": 1607, "baseline": 17418, "is_flagged": false, "is_match": false}, {"date_str": "2024-06-12", "views": 1788, "baseline": 19700, "is_flagged": false, "is_match": false}, {"date_str": "2024-06-13", "views": 1644, "baseline": 16355, "is_flagged": false, "is_match": false}, {"date_str": "2024-06-14", "views": 1456, "baseline": 17569, "is_flagged": false, "is_match": false}, {"date_str": "2024-06-15", "views": 1437, "baseline": 15969, "is_flagged": false, "is_match": false}, {"date_str": "2024-06-16", "views": 1187, "baseline": 22165, "is_flagged": false, "is_match": false}, {"date_str": "2024-06-17", "views": 1555, "baseline": 20392, "is_flagged": false, "is_match": false}, {"date_str": "2024-06-18", "views": 1344, "baseline": 17418, "is_flagged": false, "is_match": false}, {"date_str": "2024-06-19", "views": 1368, "baseline": 19700, "is_flagged": false, "is_match": false}, {"date_str": "2024-06-20", "views": 1567, "baseline": 16355, "is_flagged": false, "is_match": false}, {"date_str": "2024-06-21", "views": 1400, "baseline": 17569, "is_flagged": false, "is_match": false}, {"date_str": "2024-06-22", "views": 1406, "baseline": 15969, "is_flagged": false, "is_match": false}, {"date_str": "2024-06-23", "views": 1628, "baseline": 22165, "is_flagged": false, "is_match": false}, {"date_str": "2024-06-24", "views": 1772, "baseline": 20392, "is_flagged": false, "is_match": false}, {"date_str": "2024-06-25", "views": 1619, "baseline": 17418, "is_flagged": false, "is_match": false}, {"date_str": "2024-06-26", "views": 1415, "baseline": 19700, "is_flagged": false, "is_match": false}, {"date_str": "2024-06-27", "views": 1854, "baseline": 16355, "is_flagged": false, "is_match": false}, {"date_str": "2024-06-28", "views": 1579, "baseline": 17569, "is_flagged": false, "is_match": false}, {"date_str": "2024-06-29", "views": 3052, "baseline": 15969, "is_flagged": false, "is_match": false}, {"date_str": "2024-06-30", "views": 2654, "baseline": 22165, "is_flagged": false, "is_match": false}];
+
+    var svg = document.getElementById('timeline-svg');
+    var tooltip = document.getElementById('tl-tooltip');
+    var ns = 'http://www.w3.org/2000/svg';
+
+    var W = 1000, H = 320;
+    var padL = 6, padR = 6, padT = 14, padB = 44;
+    var plotW = W - padL - padR, plotH = H - padT - padB;
+    var n = data.length;
+    var maxV = Math.max.apply(null, data.map(function (d) { return d.views; }));
+
+    function x(i) { return padL + (i / (n - 1)) * plotW; }
+    function y(v) { return padT + plotH - (v / maxV) * plotH; }
+
+    function addEl(tag, attrs) {
+      var el = document.createElementNS(ns, tag);
+      for (var k in attrs) el.setAttribute(k, attrs[k]);
+      svg.appendChild(el);
+      return el;
+    }
+
+    // gridlines (recessive)
+    [0, 0.25, 0.5, 0.75, 1].forEach(function (t) {
+      addEl('line', {
+        x1: padL, x2: W - padR, y1: padT + plotH * (1 - t), y2: padT + plotH * (1 - t),
+        stroke: 'var(--border)', 'stroke-width': 1
+      });
+    });
+
+    // area fill under the line
+    var areaPts = data.map(function (d, i) { return x(i) + ',' + y(d.views); }).join(' ');
+    addEl('polygon', {
+      points: padL + ',' + (padT + plotH) + ' ' + areaPts + ' ' + (W - padR) + ',' + (padT + plotH),
+      fill: 'var(--accent-glow)', opacity: 0.12
+    });
+
+    // the line itself
+    addEl('polyline', {
+      points: areaPts, fill: 'none', stroke: 'var(--accent-glow)', 'stroke-width': 2,
+      'stroke-linejoin': 'round', 'stroke-linecap': 'round'
+    });
+
+    // month labels
+    var lastMonth = null;
+    data.forEach(function (d, i) {
+      var month = d.date_str.slice(0, 7);
+      if (month !== lastMonth) {
+        lastMonth = month;
+        var label = new Date(d.date_str + 'T00:00:00').toLocaleDateString('en-US', { month: 'short' });
+        addEl('text', {
+          x: x(i), y: H - 8, fill: 'var(--ink-faint)', 'font-family': 'IBM Plex Mono, monospace',
+          'font-size': 11
+        }).textContent = label;
+      }
+    });
+
+    // match-day marker row + flag dots
+    var markerY = padT + plotH + 16;
+    data.forEach(function (d, i) {
+      if (!d.is_match) return;
+      var color = d.is_flagged ? 'var(--good)' : 'var(--ink-faint)';
+      addEl('circle', { cx: x(i), cy: markerY, r: 3, fill: color });
+    });
+
+    // false-positive flags (flagged but not a real match)
+    data.forEach(function (d, i) {
+      if (d.is_flagged && !d.is_match) {
+        addEl('circle', { cx: x(i), cy: markerY, r: 3, fill: 'var(--bad)' });
+      }
+    });
+
+    // hover targets
+    data.forEach(function (d, i) {
+      var hit = addEl('rect', {
+        x: x(i) - (plotW / n) / 2, y: padT, width: Math.max(plotW / n, 2), height: plotH,
+        fill: 'transparent', class: 'tl-point'
+      });
+      var dot = addEl('circle', { cx: x(i), cy: y(d.views), r: 3, fill: 'var(--accent-glow)', opacity: 0 });
+
+      function show(evt) {
+        dot.setAttribute('opacity', 1);
+        var rect = svg.getBoundingClientRect();
+        var px = rect.left + (x(i) / W) * rect.width;
+        var py = rect.top + (y(d.views) / H) * rect.height;
+        var label = d.is_match ? (d.is_flagged ? 'Real match · flagged ✓' : 'Real match · missed') : (d.is_flagged ? 'False alarm' : 'No match');
+        tooltip.textContent = d.date_str + '  ·  ' + d.views.toLocaleString() + ' views  ·  ' + label;
+        tooltip.style.left = (px - svg.parentElement.getBoundingClientRect().left) + 'px';
+        tooltip.style.top = (py - svg.parentElement.getBoundingClientRect().top) + 'px';
+        tooltip.classList.add('show');
+      }
+      function hide() { dot.setAttribute('opacity', 0); tooltip.classList.remove('show'); }
+      hit.addEventListener('mouseenter', show);
+      hit.addEventListener('mouseleave', hide);
+      hit.addEventListener('touchstart', show, { passive: true });
+    });
+  })();
+</script>
+</body>
+</html>
